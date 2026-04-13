@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
-Short description of what this CLI does.
+CLI for the RTA analysis.
+@author: Gionmattia Carancini
 """
-
-# Cli logic: it should do as little as possible (parse arguments, default to config, call functions from core analysis).
-
 # ~~~ Libraries ~~~
 import argparse
 import pandas as pd
@@ -120,7 +118,7 @@ def resolve_params(args):
 
 
 
-# === Main ===
+# ~~~ Main ~~~
 def main():
     args = parse_args()
     config = resolve_params(args)
@@ -153,6 +151,6 @@ def main():
     output_df.to_csv(args.output, index=False)
 
 
-# === Entry point guard ===
+# ~~~ Entry point guard ~~~
 if __name__ == "__main__":
     main()
