@@ -2,6 +2,9 @@
 """
 CLI for the extraction of coverage from bigwigs files. Uses Ensembl transcript ID.
 @author: Gionmattia Carancini
+
+Usage:
+extract-coverage --bigwigs <path> --gtf <path> --txid ENSMUST00000180036 --output <path>
 """
 
 # ~~~ Libraries ~~~
