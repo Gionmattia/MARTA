@@ -1,0 +1,16 @@
+# MARTA analysis configuration
+# Contains defaults for the analysis.
+
+# Coordinate ranges (transcript positions), 0-indexed. Coordinates from defaults are from OAZ1 tests
+baseline: "100,254"  # The transcript region acting as baseline
+target: "304,733"  # The transcript region acting as target
+noise: "850,920"  # The transcript region acting as noise-control
+
+# Edge trimming (If  not excluded by the ranges, set to 25 to exclude TIS/Stop peaks)
+remove: 0
+
+# Permutation parameters
+N: 10000      # number permutations
+seed: null # for reproducibility, set to int like "42"
+pval_threshold: 0.05 # Thresholds
+jobs: 3 # number of parallel jobs allowed

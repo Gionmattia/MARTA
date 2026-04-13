@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61"]  # Check this versioning
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MARTA"
+version = "0.1.0"
+description = "Analysis of Translational Activity using Ribo-Seq coverage data"
+authors = [
+    {name = "Gionmattia Carancini", email = "gionmattia@gmail.com"}
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = [ # There are several missing dependencies here
+    "pyyaml>=6.0.2",
+    "numpy>=2.2.3",
+    "pandas>=2.2.3",
+    #"pyBigWig>=0.3.24",
+    "joblib>=1.4.2",
+    "statsmodels>=0.14.4"
+]
+
+[project.urls]
+Homepage = "https://github.com/pypa/sampleproject"
+Issues = "https://github.com/pypa/sampleproject/issues"
+
+
+[project.scripts]
+rta-analysis = "MARTA.RTA_cli:main"
+extract-coverage = "MARTA.Xtract_coverage_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"MARTA.config" = ["*.yml","*.yaml"]
+
