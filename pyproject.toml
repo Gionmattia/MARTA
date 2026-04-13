@@ -20,7 +20,8 @@ dependencies = [ # There are several missing dependencies here
     "pyyaml>=6.0.2",
     "numpy>=2.2.3",
     "pandas>=2.2.3",
-    #"pyBigWig>=0.3.24",
+    "pyBigWig>=0.3.24",
+    "pyranges>=0.1.4",
     "joblib>=1.4.2",
     "statsmodels>=0.14.4"
 ]

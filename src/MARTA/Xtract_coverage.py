@@ -9,7 +9,6 @@ from joblib import Parallel, delayed
 import multiprocessing as mp
 import pyranges as pr
 import pyBigWig
-from pathlib import Path
 import random
 import time
 import os
@@ -286,7 +285,7 @@ def read_gtf_annotation(gtf_path):
     :return: pyRanges object
     """
     gr = pr.read_gtf(gtf_path)
-    #st.info(f".gtf took: {gtf_time:.2f} to load.")
+
     return gr
 
 
