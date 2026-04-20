@@ -1,4 +1,4 @@
-# MARTA - Minor of RTA package
+# MARTA - MRNA Analysis of Regional Translational Activity
 
 Welcome to MARTA. This package contains the core functions of the RiboMARTA analysis, 
 minor the cool interactive features.

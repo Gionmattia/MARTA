@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Carancini
+    given-names: Gionmattia
+    orcid: "https://orcid.org/0000-0001-7936-4883"
+title: "MARTA - MRNA Analysis of Regional Translational Activity"
+version: 1.0.0
+date-released: 2026-04-20
+url: "https://github.com/Gionmattia/MARTA.git"
