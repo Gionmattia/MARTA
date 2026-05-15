@@ -68,11 +68,13 @@ def parse_args():
              "(0 in default_config.yml, assumes user coordinates already accounted for)"
                         )
     # Significance threshold
-    parser.add_argument("--pvalthreshold", "-p", type=float, default=None,
-        help="Significance threshold for the p-value/padj (default: 0.05)"
-                        )
+    parser.add_argument("--alpha", "-a", type=float, default=None,
+                        help="FDR significance threshold (default: 0.05)")
+    # Confidence intervals boundaries
+    parser.add_argument("--ci", type=int, default=None,
+                        help="Confidence level (percent) for null/bootstrap CI bounds (default: 95)")
     # Permutations seed
-    parser.add_argument("--seed", "-s", type=float, default=None,
+    parser.add_argument("--seed", "-s", type=int, default=None,
         help="Seed for permutations (None in default_config.yml)"
                         )
     # Permutations seed
@@ -107,12 +109,19 @@ def resolve_params(args):
         config["remove"] = args.remove
     if args.permutations is not None:
         config["N"] = args.permutations
-    if args.pvalthreshold is not None:
-        config["pval_threshold"] = args.pvalthreshold
+    if args.alpha is not None:
+        config["alpha"] = args.alpha
+    if args.ci is not None:
+        config["ci"] = args.ci
     if args.seed is not None:
         config["seed"] = args.seed
     if args.jobs is not None:
         config["jobs"] = args.jobs
+
+    required = ["baseline", "target", "noise", "remove", "N", "alpha", "ci", "seed", "jobs"]
+    missing = [k for k in required if k not in config]
+    if missing:
+        raise ValueError(f"Config is missing required keys: {missing}")
 
     return config
 
@@ -130,25 +139,58 @@ def main():
     n_base = tuple(int(x) for x in config["noise"].split(","))
 
     # Need to correct by config["remove"]!!
-    coordinates["x_slice"] = (x_base[0] + config["remove"], x_base[1] - config["remove"])
-    coordinates["y_slice"] = (y_base[0] + config["remove"], y_base[1] - config["remove"])
-    coordinates["n_slice"] = (n_base[0] + config["remove"], n_base[1] - config["remove"])
+    r = config["remove"]
+    coordinates["x_slice"] = (x_base[0] + r, x_base[1] - r)
+    coordinates["y_slice"] = (y_base[0] + r, y_base[1] - r)
+    coordinates["n_slice"] = (n_base[0] + r, n_base[1] - r)
+
+    # Check. If a user removes more than the coordinates would allow (= generate an inverted slice...).
+    for name, sl in coordinates.items():
+        if sl[1] <= sl[0]:
+            raise ValueError(
+                f"Region '{name}' is empty or inverted after applying "
+                f"--remove={config['remove']}: got slice {sl}. "
+                f"Check that your region coordinates are large enough "
+                f"to accommodate the trim you selected on both edges."
+            )
 
     # compute ci as integer
-    ci = 100 - (config["pval_threshold"]*100)
+    alpha = config["alpha"]
+    ci = config["ci"]
 
     # open input dataframe
     df = pd.read_csv(args.input)
 
     # MARTA analysis
-    output_df = run_permutation_analysis(df=df,
+    output_df, random_seed = run_permutation_analysis(df=df,
                                          coordinates=coordinates,
                                          ci = ci,
+                                         alpha=alpha,
                                          N = config["N"],
                                          n_jobs = config["jobs"],
                                          random_state=config["seed"])
 
-    output_df.to_csv(args.output, index=False)
+    output_df.to_csv(args.output, index=True)
+
+    # Save run provenance
+    provenance = {
+        "input": args.input,
+        "output": args.output,
+        "coordinates": {k: list(v) for k, v in coordinates.items()},
+        "N": config["N"],
+        "alpha": alpha,
+        "ci": ci,
+        "n_jobs": config["jobs"],
+        "random_state": int(random_seed),
+    }
+    provenance_path = args.output.rsplit(".", 1)[0] + "_run_info.yaml"
+    with open(provenance_path, "w") as f:
+        yaml.safe_dump(provenance, f)
+
+    print(f"[MARTA] Analysis complete.")
+    print(f"[MARTA] Results: {args.output}")
+    print(f"[MARTA] Run info: {provenance_path}")
+    print(f"[MARTA] random_state used: {random_seed}")
 
 
 # ~~~ Entry point guard ~~~

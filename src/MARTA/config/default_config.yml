@@ -12,5 +12,6 @@ remove: 0
 # Permutation parameters
 N: 10000      # number permutations
 seed: null # for reproducibility, set to int like "42"
-pval_threshold: 0.05 # Thresholds
+alpha: 0.05 # Thresholds
+ci: 95
 jobs: 3 # number of parallel jobs allowed

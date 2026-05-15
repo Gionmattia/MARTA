@@ -90,7 +90,7 @@ def _permute_values(
 def test_x_region(
         diffs_df: pd.DataFrame,
         perms_array: np.ndarray,
-        ci: int = 95
+        alpha: float = 0.05
 ) -> tuple[pd.DataFrame, list[str]]:
     """
     Compute p-values and identify significant runs via permutation test.
@@ -101,7 +101,7 @@ def test_x_region(
     Args:
         diffs_df: DataFrame with observed differences, must contain 'abs_xn_diff' column
         perms_array: Array of shape (N, n_runs) with null distribution
-        ci: Confidence level for FDR correction (default: 95)
+        alpha: Significance threshold for FDR correction (default: 0.05)
 
     Returns:
         results: DataFrame with columns ['x avg', 'n avg', 'padj_bh', 'reject']
@@ -122,7 +122,7 @@ def test_x_region(
     pvals = (greater + 1) / (N + 1)  # Changed from  (greater + 0.5) / (N + 1)
 
     # FDR correction for multiple testing
-    reject, pvals_bh, _, _ = multipletests(pvals, alpha=1 - (ci / 100), method='fdr_bh')
+    reject, pvals_bh, _, _ = multipletests(pvals, alpha= alpha, method='fdr_bh')
 
     # Compile results
     results = pd.DataFrame({
@@ -142,7 +142,7 @@ def test_baseline_vs_noise(
         coordinates: dict[str, tuple[int, int]],
         N: int = 10000,
         random_state: int | None = None,
-        ci: int = 95
+        alpha: float = 0.05
 ) -> tuple[pd.DataFrame, list[str]]:
     """
     Test if baseline region (x) differs significantly from noise region (n).
@@ -159,7 +159,7 @@ def test_baseline_vs_noise(
                     (start, end) tuples defining region boundaries
         N: Number of permutations for null distribution (default: 1000)
         random_state: Seed for reproducibility (default: None)
-        ci: Confidence level for statistical testing (default: 95)
+        alpha: Significance threshold for FDR correction (default: 0.05)
 
     Returns:
         results: DataFrame with columns ['x avg', 'n avg', 'padj_bh', 'reject']
@@ -174,7 +174,7 @@ def test_baseline_vs_noise(
     perms_array = _permute_values(reg_x, reg_n, N, random_state=random_state)
 
     # does the actual test, computing the p-values and adjusting them
-    results, good_runs = test_x_region(diffs_df, perms_array, ci=ci)
+    results, good_runs = test_x_region(diffs_df, perms_array, alpha=alpha)
 
     return results, good_runs
 
@@ -340,7 +340,8 @@ def _permute_ratios(y_array: np.ndarray,
 def compute_pvalues_and_ci(
         ratios_df: pd.DataFrame,
         perms_array: np.ndarray,
-        ci: int = 95
+        ci: int = 95,
+        alpha: float = 0.05
 ) -> pd.DataFrame:
     """
     Compute p-values and confidence intervals for observed RTA values.
@@ -349,10 +350,13 @@ def compute_pvalues_and_ci(
     to the null distribution, applies FDR correction, and determines
     confidence interval bounds for the null distribution.
 
+    NDR. ci and alpha are independent! one is for the confidence interval, the other for the threshold of significance.
+
     Args:
         ratios_df: DataFrame with observed RTA values and region averages
         perms_array: Array of shape (N, n_runs) with permuted RTA null distribution
         ci: Confidence level as percentage (default: 95)
+        alpha: Significance threshold for FDR correction (default: 0.05)
 
     Returns:
         DataFrame with columns:
@@ -360,8 +364,8 @@ def compute_pvalues_and_ci(
             - 'RTA': Observed Relative Translational Activity
             - 'log2RTA': Log2-transformed RTA
             - 'p-value': Raw permutation p-value
-            - 'H0_ci_lower_XX%': Lower bound of null distribution CI
-            - 'H0_ci_upper_XX%': Upper bound of null distribution CI
+            - 'null_lower_XX%': Lower bound of null distribution CI
+            - 'null_upper_XX%': Upper bound of null distribution CI
             - 'padj_bh': Benjamini-Hochberg adjusted p-value
             - 'significant': Boolean indicating statistical significance
 
@@ -380,12 +384,12 @@ def compute_pvalues_and_ci(
     pvals = (greater + 1) / (N + 1)
 
     # Compute null distribution confidence intervals
-    alpha = 100 - ci
-    lower = np.percentile(perms_array, alpha / 2, axis=0)
-    upper = np.percentile(perms_array, 100 - (alpha / 2), axis=0)
+    tail = 100 - ci
+    lower = np.percentile(perms_array, tail / 2, axis=0)
+    upper = np.percentile(perms_array, 100 - (tail / 2), axis=0)
 
     # FDR correction
-    reject, pvals_bh, _, _ = multipletests(pvals, alpha=1 - (ci / 100), method='fdr_bh')
+    reject, pvals_bh, _, _ = multipletests(pvals, alpha=alpha, method='fdr_bh')
 
     return pd.DataFrame({
         "x avg": ratios_df["x avg"],
@@ -394,8 +398,8 @@ def compute_pvalues_and_ci(
         'RTA': ratios_df["RTA"],
         'log2RTA': np.log2(ratios_df["RTA"]),
         'p-value': pvals,
-        f'H0_ci_lower_{ci}%': lower,
-        f'H0_ci_upper_{ci}%': upper,
+        f'null_lower_{ci}%': lower,
+        f'null_upper_{ci}%': upper,
         'padj_bh': pvals_bh,
         'significant': reject,
     }, index=observed.index)
@@ -489,9 +493,9 @@ def _bootstrap_rta_ci(
     )
 
     # Compute percentile-based CI
-    alpha = 100 - ci
-    lower = np.nanpercentile(bootstrap_rtas, alpha / 2, axis=0)
-    upper = np.nanpercentile(bootstrap_rtas, 100 - (alpha / 2), axis=0)
+    tail = 100 - ci
+    lower = np.nanpercentile(bootstrap_rtas, tail / 2, axis=0)
+    upper = np.nanpercentile(bootstrap_rtas, 100 - (tail / 2), axis=0)
 
     # Return as DataFrame with proper index
     return pd.DataFrame({
@@ -506,9 +510,10 @@ def _bootstrap_rta_ci(
 def run_permutation_analysis(df: pd.DataFrame,
                              coordinates: dict[str, tuple[int, int]],
                              ci: int = 95,
+                             alpha: float = 0.05,
                              N: int = 10000,
                              n_jobs: int = 3,
-                             random_state: int | None = None) -> pd.DataFrame:
+                             random_state: int | None = None) -> tuple[pd.DataFrame, int]:
     """
     Execute RiboMARTA's "permutation_analysis" pipeline with two-stage permutation testing.
 
@@ -520,6 +525,8 @@ def run_permutation_analysis(df: pd.DataFrame,
     3. RTA calculation: Compute Relative Translational Activity ratios
     4. Significance testing: Permutation test to assess RTA significance
 
+    NB. ci and alpha are independent. One dictates boundary CI estimates, the other significance threshold!
+
     Args:
         df: Coverage dataframe where rows represent nucleotide positions and
             columns represent individual runs (SRRs). Values are read counts.
@@ -528,6 +535,7 @@ def run_permutation_analysis(df: pd.DataFrame,
             - 'y_slice': (start, end) for test region
             - 'n_slice': (start, end) for noise/background region
         ci: Confidence level for statistical testing, as percentage (default: 95)
+        alpha: Significance threshold for FDR correction (default: 0.05)
         N: Number of permutations for null distribution generation (default: 10000)
         n_jobs: Number of parallel jobs for permutation computation (default: 3)
         random_state: Random seed for reproducibility. If None, results are
@@ -539,9 +547,11 @@ def run_permutation_analysis(df: pd.DataFrame,
             - 'RTA': Relative Translational Activity ratio
             - 'log2RTA': Log2-transformed RTA
             - 'p-value': Raw permutation p-value
-            - 'ci_lower_XX%', 'ci_upper_XX%': Confidence interval bounds
+            - 'null_lower_{ci}%', 'null_upper_{ci}%': Confidence interval bounds for the null hypothesis distribution of the RTA
+            - 'RTA-ci_lower_{ci}%', 'RTA-ci_upper_{ci}%: Confidence interval bounds for the observed RTA
             - 'padj_bh': Benjamini-Hochberg adjusted p-value
             - 'significant': Boolean flag indicating statistical significance
+        random state: the seed used in the run (for reproducibility)
 
         Only runs that passed the baseline vs noise filter are included.
 
@@ -557,35 +567,56 @@ def run_permutation_analysis(df: pd.DataFrame,
         ...     'y_slice': (100, 200),
         ...     'n_slice': (200, 300)
         ... }
-        >>> results = run_analysis(coverage_df, coords, ci=95, N=10000)
+        >>> results, _ = run_permutation_analysis(coverage_df, coords, ci=95, N=10000)
         >>> significant_runs = results[results['significant']]
     """
+
+    # Improvement - spawn "child seeds" to ensure reproducibility!
+    if random_state is None:
+        random_state = np.random.SeedSequence().entropy
+
+    # build a seed sequence
+    ss = np.random.SeedSequence(random_state)
+    # spawn children - number of jobs + 1 (baseline test) + 1 (boostrap)
+    child_seeds = ss.spawn(n_jobs + 2)
+
+    baseline_seed = child_seeds[0]
+    bootstrap_seed = child_seeds[1]
+    perm_seeds = child_seeds[2:]
 
     # Clean input data.
     df = _clean_data(df)
 
     # Test baseline (x) vs noise region (n).
-    results_x_vs_n, good_runs = test_baseline_vs_noise(df, coordinates, N=N, random_state=random_state, ci=ci)
+    results_x_vs_n, good_runs = test_baseline_vs_noise(df, coordinates, N=N, random_state=baseline_seed, alpha = alpha)
 
     # Compute observed RTAs and extract arrays.
     ratios_df, y_array, n_array, x_avg_array = _compute_observed_ratios(df, coordinates, good_runs)
 
+    if x_avg_array.size == 0:
+        raise ValueError(f"""
+        Studies with baseline expression: {x_avg_array.shape[0]}.
+        There was no significant expression for the baseline after filtering against noise. 
+        This means all datasets for that region lack significant RFP signal, and hence it is impossible to statistically assess
+         whether your target transcript is being translated.
+        """)
+
     # Do the permutation test again, this time testing y vs n. In parallel.
     perms_per_job = N // n_jobs
     perm_results = Parallel(n_jobs=n_jobs)(
-        delayed(_permute_ratios)(y_array, n_array, x_avg_array, perms_per_job, random_state=i)
+        delayed(_permute_ratios)(y_array, n_array, x_avg_array, perms_per_job, random_state=perm_seeds[i])
         for i in range(n_jobs)
     )
     # Stack the results into a single array (N, features).
     perms_array = np.vstack(perm_results)
 
     # Compiles results dataframe.
-    results_df = compute_pvalues_and_ci(ratios_df, perms_array, ci=ci)
+    results_df = compute_pvalues_and_ci(ratios_df, perms_array, ci=ci, alpha=alpha)
 
     # Computes CI for RTA by boostrapping.
-    bootstrap_cis = _bootstrap_rta_ci(df, coordinates, good_runs, B=N, ci=ci, random_state=random_state)
+    bootstrap_cis = _bootstrap_rta_ci(df, coordinates, good_runs, B=N, ci=ci, random_state=bootstrap_seed)
 
     # Merge into results
     results_df = results_df.join(bootstrap_cis)
 
-    return results_df
+    return results_df, int(random_state)
